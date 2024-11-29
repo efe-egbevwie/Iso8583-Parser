@@ -12,7 +12,6 @@ pluginManagement {
         }
         mavenCentral()
         gradlePluginPortal()
-        maven("https://repo.sellmair.io")
         maven("https://packages.jetbrains.team/maven/p/firework/dev")
         mavenLocal()
 
@@ -32,7 +31,6 @@ dependencyResolutionManagement {
         maven("https://repo.sellmair.io")
         mavenLocal()
         maven("https://packages.jetbrains.team/maven/p/firework/dev")
-
     }
 }
 

@@ -9,6 +9,7 @@ plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    //id("org.jetbrains.compose-hot-reload") version "1.0.0-dev.28.4" // <- add this additionally
 }
 
 kotlin {

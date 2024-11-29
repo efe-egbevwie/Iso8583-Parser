@@ -10,8 +10,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import isotools.composeapp.generated.resources.Res
-import isotools.composeapp.generated.resources.compose_multiplatform
+import isoparser.composeapp.generated.resources.Res
+import isoparser.composeapp.generated.resources.compose_multiplatform
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 

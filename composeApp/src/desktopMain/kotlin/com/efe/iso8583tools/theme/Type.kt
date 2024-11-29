@@ -5,11 +5,11 @@ import androidx.compose.runtime.Composable
 import org.jetbrains.compose.resources.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import isotools.composeapp.generated.resources.*
-import isotools.composeapp.generated.resources.Poppins_Light
-import isotools.composeapp.generated.resources.Poppins_Medium
-import isotools.composeapp.generated.resources.Poppins_Regular
-import isotools.composeapp.generated.resources.Res
+import isoparser.composeapp.generated.resources.*
+import isoparser.composeapp.generated.resources.Poppins_Light
+import isoparser.composeapp.generated.resources.Poppins_Medium
+import isoparser.composeapp.generated.resources.Poppins_Regular
+import isoparser.composeapp.generated.resources.Res
 
 @Composable
 fun bodyFontFamily() = FontFamily(

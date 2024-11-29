@@ -4,16 +4,17 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import org.jpos.iso.ISOMsg
+import org.jpos.iso.*
+import org.jpos.iso.packager.GenericPackager
 import java.lang.reflect.Field
 
-private val parsedIsoMsgStateFlow = MutableStateFlow<IsoMessage?>(null)
-val parsedIsoMsg: StateFlow<IsoMessage?> = parsedIsoMsgStateFlow.asStateFlow()
+private val parsedIsoMsgStateFlow = MutableStateFlow<ParsedIsoMessage?>(null)
+val parsedIsoMsg: StateFlow<ParsedIsoMessage?> = parsedIsoMsgStateFlow.asStateFlow()
 
 fun parseIsoMessage(isoMessageText: String) {
     try {
         val isoMsg = ISOMsg().apply {
-            packager = NibssPackager2()
+            packager = GenericPackager(javaClass.classLoader.getResourceAsStream("nibss.xml"))
         }
         val isoMsgBytes = isoMessageText.toByteArray()
         isoMsg.unpack(isoMsgBytes)
@@ -21,46 +22,121 @@ fun parseIsoMessage(isoMessageText: String) {
         val fields: Field = ISOMsg::class.java.getDeclaredField("fields")
         fields.isAccessible = true
         val isoMsgDataElements = (fields.get(isoMsg) as Map<Int, Any>)
-        val dataElementss = buildList {
-            for(i in  2..128){
-                if (isoMsg.hasField(i)){
-                    val value = isoMsg.getValue(i).toString()
-                    val dataElementName = getDataElementNameByIndex(i)
-                    val length = value.length
-                    add(
-                        DataElement(
-                            fieldIndex = i,
-                            dataElementName = dataElementName.orEmpty(),
-                            value = value,
-                            length = length,
-                            description = ""
-                        )
-                    )
-                    println("isoValue -> $value")
+        val isoMessageComponents: List<IsoMessageComponent> = buildList {
+            for (index in 2..128) {
+                if (isoMsg.hasField(index)) {
+                    val isoComponent: ISOComponent = isoMsgDataElements[index] as ISOComponent
+                    when (isoComponent) {
+                        is ISOBinaryField -> {
+                            val value = ISOUtil.hexString(isoComponent.bytes)
+                            val dataElementName = getDataElementNameByIndex(index)
+                            val length = value.length
+                            add(
+                                IsoMessageComponent.DataElement(
+                                    fieldIndex = index.toString(),
+                                    dataElementName = dataElementName.orEmpty(),
+                                    value = value,
+                                    length = length,
+                                    description = ""
+                                )
+                            )
+                        }
+
+                        is ISOField -> {
+                            val value = isoComponent.value as? String ?: ""
+                            val dataElementName = getDataElementNameByIndex(index)
+                            val length = value.length
+                            add(
+                                IsoMessageComponent.DataElement(
+                                    fieldIndex = index.toString(),
+                                    dataElementName = dataElementName.orEmpty(),
+                                    value = value,
+                                    length = length,
+                                    description = ""
+                                )
+                            )
+                        }
+
+                        is ISOMsg -> {
+                            val parentFieldIndex = index.toString()
+                            val subIsoMsgFields: Field = ISOMsg::class.java.getDeclaredField("fields")
+                            subIsoMsgFields.isAccessible = true
+                            val subIsoMsgDataElements = (subIsoMsgFields.get(isoComponent) as Map<Int, Any>)
+                            val subDataElements: MutableList<IsoMessageComponent.DataElement> = mutableListOf()
+                            subIsoMsgDataElements.keys.forEach { subIndex ->
+                                val rawElement = subIsoMsgDataElements[subIndex]
+                                if (rawElement is ISOBitMap) return@forEach
+                                val dataElement = rawElement as ISOField
+                                val value = dataElement.value as? String ?: ""
+                                val dataElementName = getDataElementNameByIndex(subIndex)
+                                val length = value.length
+                                subDataElements.add(
+                                    IsoMessageComponent.DataElement(
+                                        fieldIndex = parentFieldIndex.plus(".${subIndex}"),
+                                        dataElementName = dataElementName.orEmpty(),
+                                        value = value,
+                                        length = length,
+                                        description = ""
+                                    )
+                                )
+                            }
+                            add(
+                                IsoMessageComponent.SubIsoMessage(
+                                    parentFieldIndex = parentFieldIndex,
+                                    dataElements = subDataElements
+                                )
+                            )
+                        }
+
+                        else -> {
+                            val value = isoComponent.value as? String ?: ""
+                            val dataElementName = getDataElementNameByIndex(index)
+                            val length = value.length
+                            add(
+                                IsoMessageComponent.DataElement(
+                                    fieldIndex = index.toString(),
+                                    dataElementName = dataElementName.orEmpty(),
+                                    value = value,
+                                    length = length,
+                                    description = ""
+                                )
+                            )
+                        }
+
+                    }
                 }
             }
         }
-        val isoMessage = IsoMessage(
-            mti = isoMsg.mti,
-            dataElements = dataElementss
-        )
-        parsedIsoMsgStateFlow.update { isoMessage }
-    }catch (e:Exception){
+        parsedIsoMsgStateFlow.update { ParsedIsoMessage(mti = isoMsg.mti, isoMessageComponents = isoMessageComponents) }
+    } catch (e: Exception) {
         println("exception parsing message -> $e")
+        e.printStackTrace()
     }
 }
 
-data class IsoMessage(val mti: String, val dataElements: List<DataElement>)
+data class ParsedIsoMessage(
+    val mti: String,
+    val isoMessageComponents: List<IsoMessageComponent>
+)
 
-data class DataElement(
-    val fieldIndex: Int,
-    val dataElementName: String,
-    val value: String,
-    val length: Int,
-    val description: String? = null
-) {
-    val dataElementFieldName get() = "Field $fieldIndex: $dataElementName"
+
+sealed class IsoMessageComponent {
+    data class DataElement(
+        val fieldIndex: String,
+        val dataElementName: String,
+        val value: String,
+        val length: Int,
+        val description: String? = null
+    ) : IsoMessageComponent() {
+        val dataElementFieldName get() = "Field $fieldIndex: $dataElementName"
+    }
+
+    data class SubIsoMessage(
+        val parentFieldIndex: String,
+        val dataElements: List<DataElement>
+    ) : IsoMessageComponent()
 }
+
 
 private val dataElementNames = mapOf(
     0 to "MESSAGE TYPE INDICATOR",
